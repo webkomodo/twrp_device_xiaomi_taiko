@@ -63,6 +63,9 @@ BOARD_MKBOOTIMG_ARGS += --header_version $(BOARD_BOOT_HEADER_VERSION)
 
 BOARD_KERNEL_CMDLINE := bootopt=64S3,32N2,64N2 bootconfig
 BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
+# Tag identifikasi: bikin gampang bedain boot TWRP vs stock di pstore/dmesg.
+# Cek via: adb shell su -c "cat /sys/fs/pstore/console-ramoops-0" | grep twrp_boot
+BOARD_KERNEL_CMDLINE += androidboot.twrp_boot=taiko_twrp1
 
 # DTB / DTBO prebuilt
 BOARD_PREBUILT_DTBOIMAGE := $(KERNEL_PATH)/dtbo.img
