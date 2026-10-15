@@ -57,7 +57,8 @@ jobs:
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C
           . build/envsetup.sh
-          lunch twrp_taiko-eng
+          # A14+ wajib 3 bagian: product-release-variant
+          lunch twrp_taiko-trunk_staging-eng
           mka -j$(nproc --all) recoveryimage vendorbootimage
 
       - name: Upload artifacts

@@ -32,10 +32,10 @@ AB_OTA_POSTINSTALL_CONFIG += \
     FILESYSTEM_TYPE_vendor=ext4 \
     POSTINSTALL_OPTIONAL_vendor=true
 
-# Extra init rc: insmod driver touch varian (Goodix) yang tidak ada di
-# stock modules.load. Di-import otomatis via init.recovery.${ro.hardware}.rc.
-PRODUCT_COPY_FILES += \
-    $(DEVICE_PATH)/init.recovery.mt6789.rc:$(TARGET_COPY_OUT_RECOVERY)/root/init.recovery.mt6789.rc
+# NOTE: file recovery/root/init.recovery.mt6789.rc (insmod driver touch
+# varian Goodix) ter-copy OTOMATIS ke ramdisk recovery oleh build system
+# (mekanisme recovery/root), lalu di-import TWRP via
+# "import /init.recovery.${ro.hardware}.rc". Tidak perlu PRODUCT_COPY_FILES.
 
 # Fastbootd (penting buat device A/B tanpa recovery partition)
 PRODUCT_PACKAGES += \

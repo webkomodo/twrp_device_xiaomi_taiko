@@ -47,7 +47,7 @@ repo sync -c --force-sync --no-tags -j$(nproc)
 # 2. build
 export ALLOW_MISSING_DEPENDENCIES=true
 . build/envsetup.sh
-lunch twrp_taiko-eng
+lunch twrp_taiko-trunk_staging-eng
 mka -j$(nproc) recoveryimage vendorbootimage
 # hasil: out/target/product/taiko/recovery.img + vendor_boot.img
 ```
