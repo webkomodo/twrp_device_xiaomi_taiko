@@ -29,7 +29,9 @@ TARGET_2ND_CPU_VARIANT_RUNTIME := cortex-a55
 TARGET_BOOTLOADER_BOARD_NAME := taiko
 TARGET_NO_BOOTLOADER := true
 # TODO verify di device: getprop ro.board.platform ro.mediatek.platform
-# Helio G100 Ultra satu keluarga MT6789 (sama kayak G99). Kalau beda, ganti.
+# VERIFIED via getprop taiko asli (OS3.0.302.0): ro.board.platform=mt6789,
+# ro.vendor.mediatek.platform=MT6789, ro.soc.model=MT8781V/NA (MT8781U).
+# Helio G100 Ultra / Kompanio MT8781 satu keluarga MT6789. Sudah benar.
 TARGET_BOARD_PLATFORM := mt6789
 
 # Kernel - prebuilt dari ItzJustNett/android_device_xiaomi_taiko-kernel
