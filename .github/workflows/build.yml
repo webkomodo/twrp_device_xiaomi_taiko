@@ -45,7 +45,13 @@ jobs:
           cat > .repo/local_manifests/taiko.xml <<EOF
           <?xml version="1.0" encoding="UTF-8"?>
           <manifest>
-            <project name="$DEVICE_TREE" path="device/xiaomi/taiko" remote="github" revision="${GITHUB_REF_NAME}" />
+            <project name="$DEVICE_TREE" path="device/xiaomi/taiko" remote="github" revision="${GITHUB_REF_NAME}">
+              <!-- TeamWin android-14.1 release_config.scl butuh file ini, tapi
+                   AOSP build/bazel@android-14.0.0_r17 tidak memilikinya.
+                   Link dari tree ini (precedent: build/make juga pakai
+                   linkfile keluar project dir). -->
+              <linkfile src="helpers/schema_validation.scl" dest="build/bazel/utils/schema_validation.scl" />
+            </project>
             <project name="$KERNEL_TREE" path="device/xiaomi/taiko-kernel" remote="github" revision="main" />
           </manifest>
           EOF

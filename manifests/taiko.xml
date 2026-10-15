@@ -1,11 +1,16 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <!-- local_manifest buat build lokal. Taruh di .repo/local_manifests/taiko.xml
-     Ganti YOUR_GITHUB_USER dengan user GitHub lu setelah fork/push tree ini. -->
+     Ganti YOUR_GITHUB_USER dengan user GitHub lu setelah fork/push tree ini.
+     linkfile schema_validation.scl WAJIB: TeamWin android-14.1 butuh file
+     build/bazel/utils/schema_validation.scl yang tidak ada di
+     AOSP build/bazel@android-14.0.0_r17. -->
 <manifest>
   <project name="YOUR_GITHUB_USER/twrp_device_xiaomi_taiko"
            path="device/xiaomi/taiko"
            remote="github"
-           revision="twrp-14" />
+           revision="twrp-14">
+    <linkfile src="helpers/schema_validation.scl" dest="build/bazel/utils/schema_validation.scl" />
+  </project>
   <project name="ItzJustNett/android_device_xiaomi_taiko-kernel"
            path="device/xiaomi/taiko-kernel"
            remote="github"
