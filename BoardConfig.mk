@@ -77,7 +77,8 @@ BOARD_VENDOR_RAMDISK_KERNEL_MODULES := $(sort $(BOARD_VENDOR_RAMDISK_KERNEL_MODU
 BOARD_VENDOR_KERNEL_MODULES_LOAD := $(strip $(shell cat $(KERNEL_PATH)/vendor_dlkm/modules.load))
 BOARD_VENDOR_KERNEL_MODULES := $(wildcard $(KERNEL_PATH)/vendor_dlkm/*.ko)
 
-# A/B + dynamic partitions (copy dari tree Lineage, sudah cocok taiko)
+# A/B (wajib AB_OTA_UPDATER=true kalau define AB_OTA_PARTITIONS)
+AB_OTA_UPDATER := true
 AB_OTA_PARTITIONS += \
     system \
     system_ext \
