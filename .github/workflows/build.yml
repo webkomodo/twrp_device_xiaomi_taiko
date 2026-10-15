@@ -61,6 +61,21 @@ jobs:
           lunch twrp_taiko-trunk_staging-eng
           mka -j$(nproc --all) recoveryimage vendorbootimage
 
+      - name: Diagnose starlark/release failure
+        if: failure()
+        run: |
+          cd ~/twrp
+          echo "=== device tree release files ==="
+          ls -la device/xiaomi/taiko/release/ || echo NO_RELEASE_DIR
+          echo "=== out/ top ==="
+          ls -la out/ 2>&1 | head -20
+          echo "=== generated entrypoint ==="
+          cat out/release_config_entrypoint.scl 2>&1 | head -30 || echo NO_ENTRYPOINT
+          echo "=== manual rbcrun run (decisive test) ==="
+          out/rbcrun --mode=make --allow_external_entrypoint out/release_config_entrypoint.scl > /tmp/rbc.mk 2>/tmp/rbc.err; echo "rbcrun exit=$?"
+          echo "--- rbc stdout head ---"; head -20 /tmp/rbc.mk 2>&1
+          echo "--- rbc stderr ---"; cat /tmp/rbc.err 2>&1 | head -30
+
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
