@@ -4,8 +4,8 @@ on:
   workflow_dispatch:
     inputs:
       manifest_branch:
-        description: 'TWRP manifest branch'
-        default: 'twrp-14'
+        description: 'TWRP manifest branch (twrp-12.1 disarankan buat bringup pertama)'
+        default: 'twrp-12.1'
         required: true
       device_name:
         description: 'Device codename'
@@ -16,7 +16,7 @@ env:
   DEVICE_TREE: ${{ github.repository }}
   KERNEL_TREE: ItzJustNett/android_device_xiaomi_taiko-kernel
   MANIFEST_URL: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git
-  MANIFEST_BRANCH: ${{ inputs.manifest_branch || 'twrp-14' }}
+  MANIFEST_BRANCH: ${{ inputs.manifest_branch || 'twrp-12.1' }}
 
 jobs:
   build:
@@ -63,8 +63,13 @@ jobs:
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C
           . build/envsetup.sh
-          # A14+ wajib 3 bagian: product-release-variant
-          lunch twrp_taiko-trunk_staging-eng
+          if [[ "$MANIFEST_BRANCH" == twrp-12.1* ]]; then
+            # Manifest A12: lunch klasik 2 bagian, tanpa release machinery
+            lunch twrp_taiko-eng
+          else
+            # Manifest A14+: wajib 3 bagian product-release-variant
+            lunch twrp_taiko-trunk_staging-eng
+          fi
           mka -j$(nproc --all) recoveryimage vendorbootimage
 
       - name: Diagnose starlark/release failure
@@ -84,11 +89,21 @@ jobs:
           ls build/make/tools/rbcrun/ 2>&1
           echo "=== generated entrypoint (tail) ==="
           tail -5 out/release_config_entrypoint.scl 2>&1 || echo NO_ENTRYPOINT
-          echo "=== manual rbcrun run (decisive test) ==="
-          out/rbcrun --mode=make --allow_external_entrypoint out/release_config_entrypoint.scl > /tmp/rbc.mk 2>/tmp/rbc.err
-          echo "rbcrun exit=$?"
-          echo "--- rbc stdout head ---"; head -20 /tmp/rbc.mk 2>&1
-          echo "--- rbc stderr ---"; head -30 /tmp/rbc.err 2>&1
+          echo "=== manual rbcrun run (decisive test, twrp-14 only) ==="
+          if [ -x out/rbcrun ] && [ -f out/release_config_entrypoint.scl ]; then
+            out/rbcrun --mode=make --allow_external_entrypoint out/release_config_entrypoint.scl > /tmp/rbc.mk 2>/tmp/rbc.err
+            echo "rbcrun exit=$?"
+            echo "--- rbc stdout head ---"; head -20 /tmp/rbc.mk 2>&1
+            echo "--- rbc stderr ---"; head -30 /tmp/rbc.err 2>&1
+          else
+            echo "SKIP rbcrun test (binary or entrypoint missing - expected on twrp-12.1)"
+          fi
+          echo "=== ckati KATI_shell_no_rerun probe (twrp-14 mystery) ==="
+          ls prebuilts/build-tools/linux-x86/bin/ 2>&1 | grep -i kati || echo NO_CKATI_PREBUILT
+          printf '$(info SHELLSTATUS_BEFORE=[$(.SHELLSTATUS)])\n$(KATI_shell_no_rerun echo KATI_SHELL_RAN > /tmp/kati_probe.txt)\n$(info SHELLSTATUS_AFTER=[$(.SHELLSTATUS)])\n$(info PROBE_FILE=[$(wildcard /tmp/kati_probe.txt)])\n' > /tmp/probe.mk
+          rm -f /tmp/kati_probe.txt
+          prebuilts/build-tools/linux-x86/bin/ckati -f /tmp/probe.mk nothing 2>&1 | head -10 || echo CKATI_RUN_FAILED
+          cat /tmp/kati_probe.txt 2>&1 || echo PROBE_FILE_MISSING
           exit 0
 
       - name: Upload artifacts

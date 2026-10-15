@@ -1,5 +1,5 @@
-# vendorsetup.sh kosong disengaja.
-# - add_lunch_combo sudah obsolete di A14 ( warning tiap source envsetup ).
-# - Combo 2 bagian (twrp_taiko-eng) DITOLAK build system A14+,
-#   pakai COMMON_LUNCH_CHOICES 3 bagian di AndroidProducts.mk:
-#     lunch twrp_taiko-trunk_staging-eng
+# Combo 2 bagian buat manifest twrp-12.1 (lunch klasik).
+# Di build A14+ baris ini cuma nongol sebagai warning obsolete (harmless);
+# lunch 3 bagian diambil dari COMMON_LUNCH_CHOICES di AndroidProducts.mk.
+add_lunch_combo twrp_taiko-eng
+add_lunch_combo omni_taiko-eng
