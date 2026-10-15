@@ -1,0 +1,30 @@
+# recovery.fstab TWRP buat Redmi Pad 2 (taiko)
+# Format TWRP: <mount_point> <fstype> <device> <flags>
+# Disederhanakan dari stock init/fstab.mt6789. Slot A/B pakai flag slotselect.
+# Stock: userdata f2fs FBEv2 + inlinecrypt, metadata ext4, rescue = /cache.
+
+/boot            emmc    /dev/block/by-name/boot                flags=slotselect;avb=vbmeta
+/vendor_boot     emmc    /dev/block/by-name/vendor_boot         flags=slotselect;avb=vbmeta
+/dtbo            emmc    /dev/block/by-name/dtbo                flags=slotselect
+/vbmeta          emmc    /dev/block/by-name/vbmeta              flags=slotselect
+/super           emmc    /dev/block/by-name/super               flags=slotselect
+/metadata        ext4    /dev/block/by-name/metadata            flags=first_stage_mount
+/data            f2fs    /dev/block/by-name/userdata            flags=fileencryption=aes-256-xts:aes-256-cts:v2+inlinecrypt_optimized,keydirectory=/metadata/vold/metadata_encryption,latemount,quota
+/cache           ext4    /dev/block/by-name/rescue              flags=first_stage_mount
+/persist         ext4    /dev/block/by-name/persist             flags=display="Persist"
+/nvram           emmc    /dev/block/by-name/nvram               flags=display="Nvram";backup=1
+/nvcfg           emmc    /dev/block/by-name/nvcfg               flags=display="Nvcfg";backup=1
+/protect_f       ext4    /dev/block/by-name/protect1            flags=display="Protect F";backup=1
+/protect_s       ext4    /dev/block/by-name/protect2            flags=display="Protect S";backup=1
+# System/vendor/product adalah logical di dalam super, mount read-only buat backup
+/system          erofs   system                                 flags=slotselect;avb=vbmeta_system;logical,first_stage_mount
+/system_ext      erofs   system_ext                             flags=slotselect;avb=vbmeta_system;logical,first_stage_mount
+/vendor          erofs   vendor                                 flags=slotselect;avb;logical,first_stage_mount
+/product         erofs   product                                flags=slotselect;avb;logical,first_stage_mount
+/vendor_dlkm     erofs   vendor_dlkm                            flags=slotselect;avb;logical,first_stage_mount
+/odm_dlkm        erofs   odm_dlkm                               flags=slotselect;avb;logical,first_stage_mount
+# microSD + OTG (Redmi Pad 2 ada slot microSD, user juga sebut HDD eksternal)
+/external_sd     auto    /dev/block/mmcblk1p1                  flags=display="MicroSD";storage;wipeingui;removable
+/external_sd     auto    /dev/block/mmcblk1                    flags=display="MicroSD";storage;wipeingui;removable
+/usb_otg         auto    /dev/block/sda1                       flags=display="USB-OTG";storage;wipeingui;removable
+/usb_otg         auto    /dev/block/sda                        flags=display="USB-OTG";storage;wipeingui;removable
