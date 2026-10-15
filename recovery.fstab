@@ -4,7 +4,6 @@
 # Stock: userdata f2fs FBEv2 + inlinecrypt, metadata ext4, rescue = /cache.
 
 /boot            emmc    /dev/block/by-name/boot                flags=slotselect;avb=vbmeta
-/init_boot       emmc    /dev/block/by-name/init_boot           flags=slotselect;avb=vbmeta
 /vendor_boot     emmc    /dev/block/by-name/vendor_boot         flags=slotselect;avb=vbmeta
 /dtbo            emmc    /dev/block/by-name/dtbo                flags=slotselect
 /vbmeta          emmc    /dev/block/by-name/vbmeta              flags=slotselect

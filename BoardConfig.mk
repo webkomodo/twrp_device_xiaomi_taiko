@@ -170,12 +170,11 @@ TARGET_RECOVERY_QCOM_RTC_FIX :=
 TW_NO_SCREEN_BLANK := true
 TW_SCREEN_BLANK_ON_BOOT := true
 TW_BRIGHTNESS_PATH := "/sys/class/leds/lcd-backlight/brightness"
-TW_MAX_BRIGHTNESS := 2047
-TW_DEFAULT_BRIGHTNESS := 1200
-# TODO verifikasi di device:
-#   adb shell ls /sys/class/leds/lcd-backlight/
-#   adb shell cat /sys/class/leds/lcd-backlight/max_brightness
-# Kalau path beda (misal /sys/class/backlight/panel0-backlight/), update di sini.
+# VERIFIED di taiko asli via root: node ada (lcd-backlight + vibrator),
+# max_brightness = 4095.
+TW_MAX_BRIGHTNESS := 4095
+TW_DEFAULT_BRIGHTNESS := 1365
+# TODO (dulu): verifikasi path brightness. SELESAI 2026-10-15.
 
 TW_EXCLUDE_APEX := true
 TW_EXCLUDE_DEFAULT_USB_INIT := false

@@ -1,0 +1,9 @@
+# init.recovery.mt6789.rc - Redmi Pad 2 (taiko)
+# Stock memuat gt9896s/gt9886 via init.insmod script (bukan modules.load),
+# jadi di recovery harus insmod manual. Driver lain (nt36xxx_spi,
+# focaltech_tp, xiaomi.ko) sudah ada di vendor_dlkm/modules.load dan
+# ke-load otomatis via TW_LOAD_VENDOR_MODULES.
+# insmod yang gagal (file/driver tidak cocok varian) harmless, lanjut.
+on boot
+    insmod /vendor_dlkm/lib/modules/gt9896s.ko
+    insmod /vendor_dlkm/lib/modules/gt9886.ko

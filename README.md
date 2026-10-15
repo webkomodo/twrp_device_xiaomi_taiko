@@ -68,9 +68,9 @@ fastboot flash vendor_boot vendor_boot.img
 
 ## TODO sebelum klaim stable
 
-1. `getprop ro.board.platform` — pastikan `mt6789`, kalau beda ganti `TARGET_BOARD_PLATFORM`.
-2. Brightness path — cek `adb shell ls /sys/class/leds/` dan `max_brightness`. Update `TW_BRIGHTNESS_PATH` / `TW_MAX_BRIGHTNESS` kalau bukan `lcd-backlight` / 2047.
-3. Touchscreen — kernel modules recovery sudah di-include dari `modules.load.recovery`, tapi kalau sentuh mati kirim `dmesg` + `/tmp/recovery.log`.
+1. ~~`getprop ro.board.platform` — pastikan `mt6789`, kalau beda ganti `TARGET_BOARD_PLATFORM`.~~ SELESAI: `mt6789` (MT8781 satu keluarga).
+2. ~~Brightness path~~ SELESAI: `/sys/class/leds/lcd-backlight`, max 4095.
+3. Touchscreen — driver Novatek `nt36xxx_spi` + FocalTech ke-load via `modules.load`; varian Goodix (`gt9896s/gt9886`) di-cover `init.recovery.mt6789.rc`. Log dmesg unit ini nunjukkin Novatek yang aktif, jadi peluang touch jalan di build pertama bagus. Kalau sentuh mati kirim `dmesg` + `/tmp/recovery.log`.
 4. Decrypt /data (FBE A16) kemungkinan belum jalan di build pertama. Fallback: backup via OTG/microSD.
 5. Density/tema — `landscape_hdpi` asumsi tablet. Kalau UI kepotong, coba `portrait_hdpi`.
 6. `README.md` + density 540 di repo Lineage masih sisa emerald — jangan copy mentah ke sini.

@@ -32,6 +32,11 @@ AB_OTA_POSTINSTALL_CONFIG += \
     FILESYSTEM_TYPE_vendor=ext4 \
     POSTINSTALL_OPTIONAL_vendor=true
 
+# Extra init rc: insmod driver touch varian (Goodix) yang tidak ada di
+# stock modules.load. Di-import otomatis via init.recovery.${ro.hardware}.rc.
+PRODUCT_COPY_FILES += \
+    $(DEVICE_PATH)/init.recovery.mt6789.rc:$(TARGET_COPY_OUT_RECOVERY)/root/init.recovery.mt6789.rc
+
 # Fastbootd (penting buat device A/B tanpa recovery partition)
 PRODUCT_PACKAGES += \
     android.hardware.fastboot@1.1-impl-mock \
