@@ -9,7 +9,7 @@
            path="device/xiaomi/taiko"
            remote="github"
            revision="twrp-14">
-    <linkfile src="helpers/schema_validation.scl" dest="build/bazel/utils/schema_validation.scl" />
+    <copyfile src="helpers/schema_validation.scl" dest="build/bazel/utils/schema_validation.scl" />
   </project>
   <project name="ItzJustNett/android_device_xiaomi_taiko-kernel"
            path="device/xiaomi/taiko-kernel"
