@@ -1,0 +1,7 @@
+# device/xiaomi/taiko/release/trunk_staging.scl
+#
+# Nilai flag build untuk release trunk_staging tree ini.
+# Kosong = pakai semua default, tidak ada flag yang di-override.
+# Sudah diverifikasi aman: release_config([], []) valid dan
+# hanya mengekspor _ALL_RELEASE_FLAGS kosong.
+values = []
