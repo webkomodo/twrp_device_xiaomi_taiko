@@ -126,6 +126,10 @@ jobs:
             mkdir -p toolchain/pgo-profiles/sampling
             touch toolchain/pgo-profiles/sampling/afdo_profiles.mk
           fi
+          # TeamWin build/soong android-14 lacks soong/testing, while
+          # build/make/tools/metadata/Android.bp depends on it. The metadata
+          # host tool is not needed for recovery images.
+          rm -f build/make/tools/metadata/Android.bp
 
       - name: Disable release-config Starlark (unused for recovery)
         run: |
