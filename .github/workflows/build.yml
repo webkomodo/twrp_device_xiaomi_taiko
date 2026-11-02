@@ -103,6 +103,17 @@ jobs:
           cp "$DEVICE_DIR/helpers/schema_validation.scl" build/bazel/utils/schema_validation.scl
           ls -la build/bazel/utils/schema_validation.scl
 
+      - name: Disable unused A14 release-config Starlark
+        run: |
+          set -euo pipefail
+          cd "$WORKSPACE"
+          # TWRP recovery has no release flags. TeamWin's release-config
+          # runner fails before product parsing when the minimal manifest
+          # lacks its generated Starlark result. Keep normal Make defaults.
+          sed -i '/$(call run-starlark,$(OUT_DIR)\/release_config_entrypoint.scl/d' build/make/core/release_config.mk
+          sed -i '/$(call run-starlark,$(OUT_DIR)\/product_validation_checks_entrypoint.scl/d' build/make/core/product_validation_checks.mk
+          grep -n 'run-starlark' build/make/core/release_config.mk build/make/core/product_validation_checks.mk || true
+
       - name: Build
         run: |
           # JANGAN pakai 'set -u': envsetup.sh AOSP reference $TOP yang belum
