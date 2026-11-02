@@ -121,6 +121,11 @@ jobs:
           RELEASE_PLATFORM_SECURITY_PATCH := 2024-01-05
           RELEASE_PLATFORM_VNDK_VERSION := 34
           EOF
+          # toolchain/pgo-profiles (grup pdk) tidak ikut ter-sync; stub AFDO kosong.
+          if [ ! -f toolchain/pgo-profiles/sampling/afdo_profiles.mk ]; then
+            mkdir -p toolchain/pgo-profiles/sampling
+            touch toolchain/pgo-profiles/sampling/afdo_profiles.mk
+          fi
 
       - name: Disable release-config Starlark (unused for recovery)
         run: |
