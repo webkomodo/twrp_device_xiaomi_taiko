@@ -91,7 +91,9 @@ jobs:
 
       - name: Build
         run: |
-          set -euo pipefail
+          # JANGAN pakai 'set -u': envsetup.sh AOSP reference $TOP yang belum
+          # di-set, langsung mati "TOP: unbound variable".
+          set -eo pipefail
           cd "$WORKSPACE"
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C

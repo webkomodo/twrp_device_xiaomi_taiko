@@ -70,10 +70,9 @@ BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
 BOARD_KERNEL_CMDLINE += androidboot.twrp_boot=taiko_twrp1
 
 # DTB / DTBO prebuilt
-# MTK GKI (6.12) tidak menggunakan DTB eksternal — device tree hardcoded di kernel source.
-# Hanya dtbo.img yang perlu disertakan.
+# MTK GKI (6.12) tidak memakai DTB eksternal: base DTB disediakan bootloader
+# (lk/gz), dtbo.img cuma overlay. Jadi tidak ada BOARD_PREBUILT_DTBIMAGE_DIR.
 BOARD_PREBUILT_DTBOIMAGE := $(KERNEL_PATH)/dtbo.img
-BOARD_PREBUILT_DTBIMAGE_DIR := $(KERNEL_PATH)/dtb
 
 # Kernel modules (first-stage + recovery)
 BOARD_VENDOR_RAMDISK_KERNEL_MODULES_LOAD := $(strip $(shell cat $(KERNEL_PATH)/ramdisk/modules.load))
