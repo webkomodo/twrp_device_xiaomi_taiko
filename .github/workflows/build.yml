@@ -165,6 +165,13 @@ jobs:
           # build/make/core/build_id.mk instead.
           sed -i '/$(call run-starlark,$(OUT_DIR)\/release_config_entrypoint.scl/d' build/make/core/release_config.mk
           sed -i '/$(call run-starlark,$(OUT_DIR)\/product_validation_checks_entrypoint.scl/d' build/make/core/product_validation_checks.mk
+          # TeamWin android-14.1 regressed: soong_config.mk writes
+          # soong.$(TARGET_PRODUCT).variables, but soong_build (and bp2build) only
+          # ever read "soong.variables" (build/soong/android/config.go:72).
+          # So every run silently fell back to SetDefaultConfig -> VendorVars nil
+          # -> "Could not find ui.xml for TW_THEME: not set".
+          sed -i 's|SOONG_VARIABLES := $(SOONG_OUT_DIR)/soong.$(TARGET_PRODUCT).variables|SOONG_VARIABLES := $(SOONG_OUT_DIR)/soong.variables|' build/make/core/soong_config.mk
+          grep -n 'SOONG_VARIABLES :=' build/make/core/soong_config.mk
 
       - name: Build
         run: |
@@ -197,7 +204,9 @@ jobs:
           echo "=== kernel image ==="; file "$KERNEL_DIR/Image/Image.gz" 2>&1
           echo "=== modules count ==="; ls "$KERNEL_DIR/ramdisk"/*.ko 2>/dev/null | wc -l
           echo "=== vendor/twrp? ==="; ls -la vendor/twrp/config/BoardConfigTWRP.mk 2>&1 || echo MISSING
-          echo "=== soong.variables TW_THEME ==="; grep -o "\"TW_THEME[^,]*" out/soong/soong.variables 2>&1 | head -3 || echo "no soong.variables"
+          echo "=== soong.variables TW_THEME ==="; ls -la out/soong/soong.variables out/soong/soong.twrp_taiko.variables 2>&1; grep -o 'TW_THEME[^,]*' out/soong/soong.variables 2>&1 | head -3 || echo "no soong.variables"
+          echo "=== soong_config.mk SOONG_VARIABLES line ==="; grep -n 'SOONG_VARIABLES :=' build/make/core/soong_config.mk
+          echo "=== BoardConfigSoong present ==="; ls -la vendor/twrp/config/ 2>&1
           echo "=== rbcrun? ==="; ls -la out/rbcrun 2>&1; file out/rbcrun 2>&1
           echo "=== out products ==="; ls -la out/target/product/taiko/ 2>&1 | head -40
           echo "=== last error traces ==="
