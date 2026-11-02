@@ -183,6 +183,9 @@ jobs:
           # picked up by the global Android.bp.list, so drop the directory; nothing
           # in a recovery build consumes those flags.
           rm -rf build/make/tools/aconfig
+          # update_engine (android-14.1) still ships its own libbinderwrapper,
+          # but TeamWin system/core (android-14) already defines those modules.
+          rm -rf system/update_engine/libbinderwrapper
           # system/update_engine is TeamWin android-14, its Android.bp still
           # declares "fuzz_config.triage_assignee" which TeamWin soong's fuzz
           # module struct doesn't know.
