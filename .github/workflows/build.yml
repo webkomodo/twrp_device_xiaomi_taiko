@@ -177,6 +177,16 @@ jobs:
           sed -i 's|$(call add_json_str,  EnableUffdGc,                            $(ENABLE_UFFD_GC))|$(call add_json_bool, EnableUffdGc,                            $(filter true,$(ENABLE_UFFD_GC)))|' build/make/core/dex_preopt_config.mk
           grep -n 'SOONG_VARIABLES :=' build/make/core/soong_config.mk
           grep -n 'EnableUffdGc' build/make/core/dex_preopt_config.mk
+          # TeamWin build/make is android-14.1 but TeamWin build/soong is
+          # android-14: aconfig module types (aconfig_declarations, *_aconfig_library)
+          # don't exist in that Soong. The Android.bp under tools/aconfig is still
+          # picked up by the global Android.bp.list, so drop the directory; nothing
+          # in a recovery build consumes those flags.
+          rm -rf build/make/tools/aconfig
+          # system/update_engine is TeamWin android-14, its Android.bp still
+          # declares "fuzz_config.triage_assignee" which TeamWin soong's fuzz
+          # module struct doesn't know.
+          sed -i '/triage_assignee/d' system/update_engine/Android.bp
 
       - name: Build
         run: |
