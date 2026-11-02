@@ -89,6 +89,20 @@ jobs:
           echo "--- device ---"; ls "$DEVICE_DIR"
           echo "--- kernel ---"; ls "$KERNEL_DIR"
 
+      - name: Vendor schema_validation.scl for A14 release config
+        run: |
+          set -euo pipefail
+          cd "$WORKSPACE"
+          # TeamWin android-14.1 build/make/core/release_config.scl meng-import
+          # //build/bazel/utils:schema_validation.scl, tapi AOSP
+          # build/bazel@android-14.0.0_r17 tidak menyediakannya.
+          # Tanpa file ini rbcrun gagal dan out/starlark_results/
+          # out_release_config_entrypoint.scl.mk tidak pernah dibuat
+          # ("release_config.mk:237: No such file or directory").
+          mkdir -p build/bazel/utils
+          cp "$DEVICE_DIR/helpers/schema_validation.scl" build/bazel/utils/schema_validation.scl
+          ls -la build/bazel/utils/schema_validation.scl
+
       - name: Build
         run: |
           # JANGAN pakai 'set -u': envsetup.sh AOSP reference $TOP yang belum
