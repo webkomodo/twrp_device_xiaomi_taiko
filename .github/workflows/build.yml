@@ -171,7 +171,12 @@ jobs:
           # So every run silently fell back to SetDefaultConfig -> VendorVars nil
           # -> "Could not find ui.xml for TW_THEME: not set".
           sed -i 's|SOONG_VARIABLES := $(SOONG_OUT_DIR)/soong.$(TARGET_PRODUCT).variables|SOONG_VARIABLES := $(SOONG_OUT_DIR)/soong.variables|' build/make/core/soong_config.mk
+          # TeamWin android-14.1 also kept add_json_str for EnableUffdGc while its
+          # own dexpreopt Go struct (and AOSP 14) declares a bool -> soong_build
+          # panics "cannot unmarshal string into Go struct field ... EnableUffdGc".
+          sed -i 's|$(call add_json_str,  EnableUffdGc,                            $(ENABLE_UFFD_GC))|$(call add_json_bool, EnableUffdGc,                            $(filter true,$(ENABLE_UFFD_GC)))|' build/make/core/dex_preopt_config.mk
           grep -n 'SOONG_VARIABLES :=' build/make/core/soong_config.mk
+          grep -n 'EnableUffdGc' build/make/core/dex_preopt_config.mk
 
       - name: Build
         run: |
