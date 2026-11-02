@@ -81,8 +81,11 @@ BOARD_VENDOR_RAMDISK_KERNEL_MODULES := $(addprefix $(KERNEL_PATH)/ramdisk/, $(BO
 BOARD_VENDOR_RAMDISK_RECOVERY_KERNEL_MODULES_LOAD := $(strip $(shell cat $(KERNEL_PATH)/ramdisk/modules.load.recovery))
 RECOVERY_MODULES := $(addprefix $(KERNEL_PATH)/ramdisk/, $(BOARD_VENDOR_RAMDISK_RECOVERY_KERNEL_MODULES_LOAD))
 BOARD_VENDOR_RAMDISK_KERNEL_MODULES := $(sort $(BOARD_VENDOR_RAMDISK_KERNEL_MODULES) $(RECOVERY_MODULES))
-BOARD_VENDOR_KERNEL_MODULES_LOAD := $(strip $(shell cat $(KERNEL_PATH)/vendor_dlkm/modules.load))
-BOARD_VENDOR_KERNEL_MODULES := $(wildcard $(KERNEL_PATH)/vendor_dlkm/*.ko)
+# Vendor_dlkm: modul device ini SEMUA ada di vendor_boot (vendor_ramdisk),
+# tidak ada partition vendor_dlkm terpisah di board kernel tree recovery.
+# Build vendor_dlkm image sendiri akan duplikasi isi vendor_boot. Skip.
+# BOARD_VENDOR_KERNEL_MODULES_LOAD :=
+# BOARD_VENDOR_KERNEL_MODULES :=
 
 # A/B (wajib AB_OTA_UPDATER=true kalau define AB_OTA_PARTITIONS)
 AB_OTA_UPDATER := true

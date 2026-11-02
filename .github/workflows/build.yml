@@ -4,109 +4,127 @@ on:
   workflow_dispatch:
     inputs:
       manifest_branch:
-        description: 'TWRP manifest branch (twrp-12.1 disarankan buat bringup pertama)'
-        default: 'twrp-12.1'
+        description: 'TWRP manifest branch (twrp-14 wajib: kernel GKI 6.12 / Android 16)'
+        default: 'twrp-14'
         required: true
-      device_name:
-        description: 'Device codename'
-        default: 'taiko'
-        required: true
+        type: choice
+        options: [twrp-14, twrp-12.1]
 
 env:
+  DEVICE_DIR: device/xiaomi/taiko
+  KERNEL_DIR: device/xiaomi/taiko-kernel
   DEVICE_TREE: ${{ github.repository }}
-  KERNEL_TREE: ItzJustNett/android_device_xiaomi_taiko-kernel
+  KERNEL_TREE: ${{ github.repository_owner }}/kernel_xiaomi_taiko
   MANIFEST_URL: https://github.com/minimal-manifest-twrp/platform_manifest_twrp_aosp.git
-  MANIFEST_BRANCH: ${{ inputs.manifest_branch || 'twrp-12.1' }}
+  MANIFEST_BRANCH: ${{ inputs.manifest_branch }}
+  WORKSPACE: /home/runner/twrp
 
 jobs:
   build:
     runs-on: ubuntu-22.04
+    timeout-minutes: 300
+
     steps:
-      - name: Free disk space
-        run: |
-          sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc 2>/dev/null || true
-          df -h
+      # Runner GitHub cuma ~14GB kosong. TWRP butuh 80-100GB.
+      # Hapus toolchain preinstall (/usr/local/lib/android ~9GB, dotnet, ghc, haskell)
+      # + swap file + docker image. Ini trik standar build AOSP di Actions.
+      - name: Free disk space (largest)
+        uses: jlumbroso/free-disk-space@main
+        with:
+          tool-cache: true
+          android: true
+          dotnet: true
+          haskell: true
+          large-packages: false      # butuh beberapa pkg tetap (build-essential dll)
+          docker-images: true
+          swap-storage: true
+
+      - name: Checkout device tree
+        uses: actions/checkout@v4
+        with:
+          path: devicetree
+          fetch-depth: 1
+
+      - name: Disk report after free
+        run: df -h /
 
       - name: Install deps
         run: |
           sudo apt-get update -qq
-          sudo apt-get install -y -qq git repo python3 python3-pip gperf \
-            build-essential zip curl libssl-dev libncurses5-dev \
-            libxml2-utils xsltproc ccache schedtool lz4
-          git config --global user.name "twrp-buildbot"
+          sudo apt-get install -y -qq --no-install-recommends \
+            git repo python3 python3-pip gperf \
+            build-essential zip curl libssl-dev libncurses5 \
+            libxml2-utils xsltproc ccache schedtool lz4 unzip
+          sudo mkdir -p /usr/local/bin
+          sudo ln -sf /usr/bin/python3 /usr/local/bin/python || true
+          git config --global user.name  "twrp-buildbot"
           git config --global user.email "buildbot@local"
           git config --global color.ui false
 
-      - name: Repo init + sync (shallow, minimal)
+      - name: Repo init + sync
         run: |
-          mkdir -p ~/twrp && cd ~/twrp
-          repo init --depth=1 -u "$MANIFEST_URL" -b "$MANIFEST_BRANCH" -g default,-mips,-darwin,-notdefault
+          set -euo pipefail
+          sudo mkdir -p /home/runner && sudo chown runner /home/runner || true
+          mkdir -p "$WORKSPACE" && cd "$WORKSPACE"
+          repo init --depth=1 -u "$MANIFEST_URL" -b "$MANIFEST_BRANCH" \
+                   -g default,-mips,-darwin,-notdefault
           mkdir -p .repo/local_manifests
-          cat > .repo/local_manifests/taiko.xml <<EOF
-          <?xml version="1.0" encoding="UTF-8"?>
-          <manifest>
-            <project name="$DEVICE_TREE" path="device/xiaomi/taiko" remote="github" revision="${GITHUB_REF_NAME}">
-              <!-- TeamWin android-14.1 release_config.scl butuh file ini, tapi
-                   AOSP build/bazel@android-14.0.0_r17 tidak memilikinya.
-                   Pakai copyfile (BUKAN linkfile): rbcrun menolak symlink
-                   ke file starlark. -->
-              <copyfile src="helpers/schema_validation.scl" dest="build/bazel/utils/schema_validation.scl" />
-            </project>
-            <project name="$KERNEL_TREE" path="device/xiaomi/taiko-kernel" remote="github" revision="main" />
-          </manifest>
-          EOF
-          repo sync -c --force-sync --no-clone-bundle --no-tags -j$(nproc --all) --optimized-fetch --prune
+          repo sync -c --force-sync --no-clone-bundle --no-tags --optimized-fetch \
+                   --prune -j"$(nproc --all)"
 
-      - name: Build recovery + vendor_boot
+      - name: Place device + kernel trees
         run: |
-          cd ~/twrp
+          set -euo pipefail
+          cd "$WORKSPACE"
+          rm -rf "$DEVICE_DIR" "$KERNEL_DIR"
+          mkdir -p "$(dirname "$DEVICE_DIR")"
+          # Device tree: dsalin dari checkout step (working tree, bukan fetch ulang)
+          cp -r "$GITHUB_WORKSPACE/devicetree" "$DEVICE_DIR"
+          rm -rf "$DEVICE_DIR/.git" "$DEVICE_DIR/.github" || true
+          git -C "$DEVICE_DIR" init -q
+          git -C "$DEVICE_DIR" add -A
+          git -C "$DEVICE_DIR" -c user.name=ci -c user.email=ci@local commit -qm device-tree || true
+          # Kernel tree: clone dari repo GitHub pemilik sama
+          git clone --depth=1 "https://github.com/${KERNEL_TREE}.git" "$KERNEL_DIR"
+          echo "--- device ---"; ls "$DEVICE_DIR"
+          echo "--- kernel ---"; ls "$KERNEL_DIR"
+
+      - name: Build
+        run: |
+          set -euo pipefail
+          cd "$WORKSPACE"
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C
+          export USE_CCACHE=1
+          export CCACHE_DIR="$WORKSPACE/.ccache"
+          ccache -M 10G -F 0 || true
           . build/envsetup.sh
+          # A14+ wajib 3 bagian: product-release-variant. A12: 2 bagian.
           if [[ "$MANIFEST_BRANCH" == twrp-12.1* ]]; then
-            # Manifest A12: lunch klasik 2 bagian, tanpa release machinery
             lunch twrp_taiko-eng
           else
-            # Manifest A14+: wajib 3 bagian product-release-variant
             lunch twrp_taiko-trunk_staging-eng
           fi
-          mka -j$(nproc --all) recoveryimage vendorbootimage
+          mka -j"$(nproc --all)" recoveryimage vendorbootimage
 
-      - name: Diagnose starlark/release failure
+      - name: Diagnostics on failure
         if: failure()
         run: |
           set +e
-          cd ~/twrp
-          echo "=== device tree release files ==="
-          ls -la device/xiaomi/taiko/release/ || echo NO_RELEASE_DIR
-          echo "=== rbcrun binary? ==="
-          ls -la out/rbcrun 2>&1
-          file out/rbcrun 2>&1
-          echo "=== microfactory rbcrun trace (go build log) ==="
-          cat out/.rbcrun.trace 2>&1 | head -40
-          echo "=== go prebuilt? ==="
-          ls prebuilts/go/linux-x86/bin/ 2>&1 | head -5
-          ls build/make/tools/rbcrun/ 2>&1
-          echo "=== generated entrypoint (tail) ==="
-          tail -5 out/release_config_entrypoint.scl 2>&1 || echo NO_ENTRYPOINT
-          echo "=== manual rbcrun run (decisive test, twrp-14 only) ==="
-          if [ -x out/rbcrun ] && [ -f out/release_config_entrypoint.scl ]; then
-            out/rbcrun --mode=make --allow_external_entrypoint out/release_config_entrypoint.scl > /tmp/rbc.mk 2>/tmp/rbc.err
-            echo "rbcrun exit=$?"
-            echo "--- rbc stdout head ---"; head -20 /tmp/rbc.mk 2>&1
-            echo "--- rbc stderr ---"; head -30 /tmp/rbc.err 2>&1
-          else
-            echo "SKIP rbcrun test (binary or entrypoint missing - expected on twrp-12.1)"
-          fi
-          echo "=== ckati KATI_shell_no_rerun probe (twrp-14 mystery) ==="
-          ls prebuilts/build-tools/linux-x86/bin/ 2>&1 | grep -i kati || echo NO_CKATI_PREBUILT
-          printf '$(info SHELLSTATUS_BEFORE=[$(.SHELLSTATUS)])\n$(KATI_shell_no_rerun echo KATI_SHELL_RAN > /tmp/kati_probe.txt)\n$(info SHELLSTATUS_AFTER=[$(.SHELLSTATUS)])\n$(info PROBE_FILE=[$(wildcard /tmp/kati_probe.txt)])\n' > /tmp/probe.mk
-          rm -f /tmp/kati_probe.txt
-          prebuilts/build-tools/linux-x86/bin/ckati -f /tmp/probe.mk nothing 2>&1 | head -10 || echo CKATI_RUN_FAILED
-          cat /tmp/kati_probe.txt 2>&1 || echo PROBE_FILE_MISSING
+          cd "$WORKSPACE"
+          echo "=== df ==="; df -h /
+          echo "=== device tree ==="; ls -la "$DEVICE_DIR" || echo MISSING
+          echo "=== kernel tree ===";  ls -la "$KERNEL_DIR" || echo MISSING
+          echo "=== kernel image ==="; file "$KERNEL_DIR/Image/Image.gz" 2>&1
+          echo "=== modules count ==="; ls "$KERNEL_DIR/ramdisk"/*.ko 2>/dev/null | wc -l
+          echo "=== rbcrun? ==="; ls -la out/rbcrun 2>&1; file out/rbcrun 2>&1
+          echo "=== out products ==="; ls -la out/target/product/taiko/ 2>&1 | head -40
+          echo "=== last error traces ==="
+          find out -name '*.log' -newermt '-40 minutes' 2>/dev/null | head -10 | xargs -r tail -n 40
           exit 0
 
       - name: Upload artifacts
+        if: success()
         uses: actions/upload-artifact@v4
         with:
           name: twrp-taiko-${{ github.run_number }}
@@ -115,3 +133,4 @@ jobs:
             /home/runner/twrp/out/target/product/taiko/vendor_boot.img
             /home/runner/twrp/out/target/product/taiko/install/*.zip
           if-no-files-found: warn
+          retention-days: 14
