@@ -227,7 +227,11 @@ jobs:
           else
             lunch twrp_taiko-trunk_staging-eng
           fi
-          mka -j"$(nproc --all)" recoveryimage vendorbootimage
+          # Panggil soong_ui langsung (ekuivalen 'm') supaya bisa skip
+          # Go unit tests host ("test android/soong/*") — tidak dibutuhkan
+          # untuk recovery image.
+          build/soong/soong_ui.bash --make-mode --skip-soong-tests \
+            -j"$(nproc --all)" recoveryimage vendorbootimage
 
       - name: Diagnostics on failure
         if: failure()
