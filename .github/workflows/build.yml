@@ -135,6 +135,23 @@ jobs:
           # Soong; these directories are Google/AOSP-only.
           rm -rf build/make/teams
           rm -f build/make/target/product/gsi/Android.bp
+          # config.mk hard-includes vendor/twrp/config/BoardConfigTWRP.mk,
+          # which also exports TW_THEME to Soong. The minimal manifest may not
+          # have synced it; vendor the two files needed.
+          if [ ! -f vendor/twrp/config/BoardConfigTWRP.mk ]; then
+            mkdir -p vendor/twrp/config
+            curl -fsSL "https://raw.githubusercontent.com/TeamWin/android_vendor_twrp/android-14/config/BoardConfigTWRP.mk" \
+              -o vendor/twrp/config/BoardConfigTWRP.mk
+          fi
+          if [ ! -f vendor/twrp/config/BoardConfigSoong.mk ]; then
+            curl -fsSL "https://raw.githubusercontent.com/TeamWin/android_vendor_twrp/android-14/config/BoardConfigSoong.mk" \
+              -o vendor/twrp/config/BoardConfigSoong.mk
+          fi
+          if [ ! -f vendor/twrp/config/BoardConfigKernel.mk ]; then
+            curl -fsSL "https://raw.githubusercontent.com/TeamWin/android_vendor_twrp/android-14/config/BoardConfigKernel.mk" \
+              -o vendor/twrp/config/BoardConfigKernel.mk
+          fi
+          ls -la vendor/twrp/config/
 
       - name: Disable release-config Starlark (unused for recovery)
         run: |
@@ -176,6 +193,7 @@ jobs:
           echo "=== kernel tree ===";  ls -la "$KERNEL_DIR" || echo MISSING
           echo "=== kernel image ==="; file "$KERNEL_DIR/Image/Image.gz" 2>&1
           echo "=== modules count ==="; ls "$KERNEL_DIR/ramdisk"/*.ko 2>/dev/null | wc -l
+          echo "=== vendor/twrp? ==="; ls -la vendor/twrp/config/BoardConfigTWRP.mk 2>&1 || echo MISSING
           echo "=== rbcrun? ==="; ls -la out/rbcrun 2>&1; file out/rbcrun 2>&1
           echo "=== out products ==="; ls -la out/target/product/taiko/ 2>&1 | head -40
           echo "=== last error traces ==="
