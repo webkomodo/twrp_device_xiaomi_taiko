@@ -103,16 +103,34 @@ jobs:
           cp "$DEVICE_DIR/helpers/schema_validation.scl" build/bazel/utils/schema_validation.scl
           ls -la build/bazel/utils/schema_validation.scl
 
-      - name: Disable unused A14 release-config Starlark
+      - name: Provide minimal A14 platform defaults
         run: |
           set -euo pipefail
           cd "$WORKSPACE"
-          # TWRP recovery has no release flags. TeamWin's release-config
-          # runner fails before product parsing when the minimal manifest
-          # lacks its generated Starlark result. Keep normal Make defaults.
+          # Minimal TWRP manifest omits AOSP release flag declarations.
+          # Recovery packaging needs version variables, not Android framework.
+          cat > build/make/core/build_id.mk <<'EOF'
+          RELEASE_PLATFORM_VERSION := 14
+          RELEASE_PLATFORM_VERSION_CODENAME := REL
+          RELEASE_PLATFORM_VERSION_ALL_CODENAMES := REL
+          RELEASE_PLATFORM_VERSION_ALL_PREVIEW_CODENAMES :=
+          RELEASE_PLATFORM_VERSION_LAST_STABLE := 14
+          RELEASE_PLATFORM_VERSION_KNOWN_CODENAMES := REL
+          RELEASE_PLATFORM_SDK_VERSION := 34
+          RELEASE_PLATFORM_SDK_EXTENSION_VERSION := 0
+          RELEASE_PLATFORM_SECURITY_PATCH := 2024-01-05
+          RELEASE_PLATFORM_VNDK_VERSION := 34
+          EOF
+
+      - name: Disable release-config Starlark (unused for recovery)
+        run: |
+          set -euo pipefail
+          cd "$WORKSPACE"
+          # Minimal manifest has no release flag declarations, so the Starlark
+          # entrypoint cannot run. Platform values are supplied by
+          # build/make/core/build_id.mk instead.
           sed -i '/$(call run-starlark,$(OUT_DIR)\/release_config_entrypoint.scl/d' build/make/core/release_config.mk
           sed -i '/$(call run-starlark,$(OUT_DIR)\/product_validation_checks_entrypoint.scl/d' build/make/core/product_validation_checks.mk
-          grep -n 'run-starlark' build/make/core/release_config.mk build/make/core/product_validation_checks.mk || true
 
       - name: Build
         run: |
