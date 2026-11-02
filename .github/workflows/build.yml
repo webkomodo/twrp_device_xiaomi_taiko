@@ -186,6 +186,24 @@ jobs:
           # update_engine (android-14.1) still ships its own libbinderwrapper,
           # but TeamWin system/core (android-14) already defines those modules.
           rm -rf system/update_engine/libbinderwrapper
+          # external/brotli (AOSP) whitelists who may use libbrotli and does not
+          # list //system/extras/partition_tools; lpdumpd pulls it in via
+          # libsnapshot_cow. Recovery doesn't need lpdumpd, so drop the module
+          # instead of editing an AOSP file.
+          # lpdumpd pulls libbrotli via libsnapshot_cow, but external/brotli
+          # (AOSP) visibility doesn't list //system/extras/partition_tools.
+          # Recovery doesn't need lpdumpd, so drop the module instead of
+          # editing an AOSP file.
+          python3 -c "
+          import re
+          p='system/extras/partition_tools/Android.bp'
+          s=open(p).read()
+          s=re.sub('cc_binary \{\n    name: .lpdumpd.,.*?\n\}\n','',s,flags=re.S)
+          s=re.sub('\n *required: \[\n *.lpdumpd.,\n *\],\n','\n',s)
+          s=re.sub('\n *.lpdumpd.,\n','\n',s)
+          open(p,'w').write(s)
+          "
+          grep -c "lpdumpd" system/extras/partition_tools/Android.bp || echo "lpdumpd removed"
           # system/update_engine is TeamWin android-14, its Android.bp still
           # declares "fuzz_config.triage_assignee" which TeamWin soong's fuzz
           # module struct doesn't know.
