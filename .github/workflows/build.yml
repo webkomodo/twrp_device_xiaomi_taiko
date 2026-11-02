@@ -131,6 +131,10 @@ jobs:
           # host tools. Recovery does not use them.
           rm -f build/make/tools/metadata/Android.bp
           rm -f build/make/tools/rbcrun/Android.bp
+          # "team" and "install_symlink" module types are newer than TeamWin's
+          # Soong; these directories are Google/AOSP-only.
+          rm -rf build/make/teams
+          rm -f build/make/target/product/gsi/Android.bp
 
       - name: Disable release-config Starlark (unused for recovery)
         run: |
