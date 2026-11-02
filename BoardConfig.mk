@@ -34,11 +34,12 @@ TARGET_NO_BOOTLOADER := true
 # Helio G100 Ultra / Kompanio MT8781 satu keluarga MT6789. Sudah benar.
 TARGET_BOARD_PLATFORM := mt6789
 
-# Kernel - prebuilt dari ItzJustNett/android_device_xiaomi_taiko-kernel
+# Kernel - prebuilt lokal dari ROM stock taiko
 # Kernel 6.12.30-android16-5 (GKI 4k), header v4, vendor_boot A/B
+# Diekstrak dari boot.img + vendor_boot.img menggunakan MTK LZ4 legacy decoder
 TARGET_NO_KERNEL_OVERRIDE := true
 TARGET_KERNEL_SOURCE := $(KERNEL_PATH)/kernel-headers
-LOCAL_KERNEL := $(KERNEL_PATH)/Image.gz
+LOCAL_KERNEL := $(KERNEL_PATH)/Image/Image.gz
 PRODUCT_COPY_FILES += \
 	$(LOCAL_KERNEL):kernel
 
@@ -50,7 +51,8 @@ BOARD_KERNEL_TAGS_OFFSET := 0x07c88000
 BOARD_DTB_OFFSET := 0x07c88000
 BOARD_BOOT_HEADER_VERSION := 4
 
-BOARD_INCLUDE_DTB_IN_BOOTIMG := true
+# No external DTB for MTK GKI 6.12 — DT embedded in kernel image or device tree hardcoded.
+BOARD_INCLUDE_DTB_IN_BOOTIMG := false
 BOARD_RAMDISK_USE_LZ4 := true
 BOARD_USES_GENERIC_KERNEL_IMAGE := true
 BOARD_MOVE_GSI_AVB_KEYS_TO_VENDOR_BOOT := true
@@ -68,8 +70,10 @@ BOARD_KERNEL_CMDLINE += androidboot.selinux=permissive
 BOARD_KERNEL_CMDLINE += androidboot.twrp_boot=taiko_twrp1
 
 # DTB / DTBO prebuilt
+# MTK GKI (6.12) tidak menggunakan DTB eksternal — device tree hardcoded di kernel source.
+# Hanya dtbo.img yang perlu disertakan.
 BOARD_PREBUILT_DTBOIMAGE := $(KERNEL_PATH)/dtbo.img
-BOARD_PREBUILT_DTBIMAGE_DIR := $(KERNEL_PATH)/dtb
+# BOARD_PREBUILT_DTBIMAGE_DIR dihapus: no separate DTB file for this kernel.
 
 # Kernel modules (first-stage + recovery)
 BOARD_VENDOR_RAMDISK_KERNEL_MODULES_LOAD := $(strip $(shell cat $(KERNEL_PATH)/ramdisk/modules.load))
