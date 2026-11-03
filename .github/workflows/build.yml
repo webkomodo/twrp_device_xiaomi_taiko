@@ -211,6 +211,33 @@ jobs:
           # core/tasks/fontchain_lint.mk, so drop the newer copy.
           rm -f build/make/core/tasks/fontchain_lint.mk
           ls build/make/core/tasks/fontchain_lint.mk 2>/dev/null || echo "fontchain_lint.mk removed"
+          # TeamWin android-14.1 dropped the merge-fc-files call from
+          # build/make/core/Makefile, but the synced system/sepolicy is still
+          # android-14 and its Android.mk declares a dependency on
+          # file_contexts.modules.tmp -> ninja dies with "missing and no known
+          # rule to make it". Restore the AOSP 14 block right before SELINUX_FC.
+          python3 - <<'PY'
+          import re, sys
+          p = 'build/make/core/Makefile'
+          s = open(p).read()
+          if 'merge-fc-files' not in s:
+              block = (
+                  "\n# Collects file_contexts files from modules to be installed\n"
+                  "$(call merge-fc-files, \\\n"
+                  "  $(sort $(foreach m,$(product_MODULES),$(ALL_MODULES.$(m).FILE_CONTEXTS))),\\\n"
+                  "  $(call intermediates-dir-for,ETC,file_contexts.bin)/file_contexts.modules.tmp)\n\n"
+              )
+              s, n = re.subn(
+                  r'(\nSELINUX_FC := \$\(call intermediates-dir-for,ETC,file_contexts\.bin\)/file_contexts\.bin\n)',
+                  block + r'\1', s, count=1)
+              if n == 0:
+                  sys.exit('anchor SELINUX_FC not found in core/Makefile')
+              open(p, 'w').write(s)
+              print('restored merge-fc-files block in core/Makefile')
+          else:
+              print('merge-fc-files already present')
+          PY
+          grep -n "merge-fc-files" build/make/core/Makefile
           # TeamWin build/make is android-14.1 but TeamWin build/soong is
           # android-14: aconfig module types (aconfig_declarations, *_aconfig_library)
           # don't exist in that Soong. The Android.bp under tools/aconfig is still
