@@ -319,48 +319,58 @@ jobs:
           # declares "fuzz_config.triage_assignee" which TeamWin soong's fuzz
           # module struct doesn't know.
           sed -i '/triage_assignee/d' system/update_engine/Android.bp
-          # LOCAL_SHARED_LIBRARIES must name a module Make registers as
-          # SHARED_LIBRARIES. binary.mk unconditionally emits "<lib>.so.toc" as a
-          # link prerequisite for every entry, so an unknown name dangles and only
-          # surfaces much later as an opaque ninja "no known rule to make it".
-          # resolve-shared-libs-depes runs after every Android.mk (incl. Soong's)
-          # is loaded, so ALL_MODULES.<dep>.CLASS is complete there.
+          # binary.mk turns every LOCAL_SHARED_LIBRARIES entry into a
+          # "<lib>.so.toc" link prerequisite, so a name Make never registered has
+          # no rule and the link dies much later as an opaque ninja error. Soong
+          # modules resolve their own deps and are skipped. This runs after the
+          # install list is known, so only modules that land in the recovery image
+          # or the product's system image can abort the build.
           python3 - <<'PY'
           import sys
           p = 'build/make/core/main.mk'
           s = open(p).read()
-          if 'INVALID_SHARED_LIB_DEPS' in s:
+          if 'check-shared-lib-deps' in s:
               print('shared-lib binary check already present')
               sys.exit(0)
-          anchor = (
-              "  $(eval r := $(filter $($(root))/%,$(call module-installed-files,\\\n"
-              "    $(deps))))\\\n"
-          )
-          check = (
-              "  $(eval unresolved_so_deps := $(foreach d,$(deps),$(if $(filter SHARED_LIBRARIES,$(ALL_MODULES.$(d).CLASS)),,$(d))))\\\n"
-              "  $(if $(unresolved_so_deps),$(eval INVALID_SHARED_LIB_DEPS += \"$(mod) -> $(unresolved_so_deps)\"))\\\n"
-          )
-          if anchor not in s:
-              sys.exit('resolve-shared-libs-depes anchor not found in core/main.mk')
-          s = s.replace(anchor, anchor + check, 1)
-          tail = (
-              "endif\nendif\n\n"
-              "# Pass the shared libraries dependencies to prebuilt ELF file check.\n"
-          )
-          abort = (
-              "ifneq ($(strip $(INVALID_SHARED_LIB_DEPS)),)\n"
-              "$(error INVALID LOCAL_SHARED_LIBRARIES (not registered as "
-              "SHARED_LIBRARIES, so no .so/.so.toc rule exists): "
-              "$(INVALID_SHARED_LIB_DEPS))\n"
-              "endif\n\n"
-          )
-          if tail not in s:
-              sys.exit('post-resolve anchor not found in core/main.mk')
-          s = s.replace(tail, tail + abort, 1)
-          open(p, 'w').write(s)
+          scan = r'''define check-shared-lib-deps
+          $(foreach m,$(TARGET_DEPENDENCIES_ON_SHARED_LIBRARIES) $(TARGET_2ND_ARCH_DEPENDENCIES_ON_SHARED_LIBRARIES) $(HOST_DEPENDENCIES_ON_SHARED_LIBRARIES) $(HOST_2ND_ARCH_DEPENDENCIES_ON_SHARED_LIBRARIES),\
+            $(eval _sl_p := $(subst :,$(space),$(m)))\
+            $(eval _sl_mod := $(firstword $(_sl_p)))\
+            $(eval _sl_deps := $(subst $(comma),$(space),$(lastword $(_sl_p))))\
+            $(if $(ALL_MODULES.$(_sl_mod).SOONG_MODULE_TYPE),,\
+              $(eval _sl_bad := $(patsubst %$(comma),%,$(subst $(space),,$(foreach d,$(_sl_deps),$(if $(ALL_MODULES.$(d).PATH),$(if $(filter SHARED_LIBRARIES,$(ALL_MODULES.$(d).CLASS)),,notshlib:$(d)$(comma)),unregistered:$(d)$(comma))))))\
+              $(if $(_sl_bad),$(eval INVALID_SHARED_LIB_DEPS += $(_sl_mod)|$(_sl_bad)))\
+              $(if $(filter $(TARGET_RECOVERY_ROOT_OUT)/% $(TARGET_OUT)/%,$(ALL_MODULES.$(_sl_mod).INSTALLED)),\
+                $(if $(_sl_bad),$(eval FATAL_SHARED_LIB_DEPS += $(_sl_mod)|$(_sl_bad))))))
+          endef
+
+          $(eval $(call check-shared-lib-deps))
+          $(info shared-lib dep scan: $(words $(INVALID_SHARED_LIB_DEPS)) bad entries over $(words $(TARGET_DEPENDENCIES_ON_SHARED_LIBRARIES)) target modules)
+          $(foreach e,$(wordlist 1,80,$(INVALID_SHARED_LIB_DEPS)),$(info INVALID_SHARED_LIB $(e)))
+          $(info PRODUCT_PACKAGES with no registered module: $(strip $(foreach m,$(patsubst %:64,%,$(patsubst %:32,%,$(PRODUCT_PACKAGES))),$(if $(ALL_MODULES.$(m).PATH),,NONEXISTENT:$(m)))))
+          ifneq ($(strip $(FATAL_SHARED_LIB_DEPS)),)
+          $(warning INVALID LOCAL_SHARED_LIBRARIES (no .so/.so.toc rule exists): $(FATAL_SHARED_LIB_DEPS))
+          endif
+
+          '''
+          anchor = "ALL_DEFAULT_INSTALLED_MODULES := $(modules_to_install)\n"
+          if s.count(anchor) != 1:
+              sys.exit('modules_to_install anchor not unique in core/main.mk')
+          open(p, 'w').write(s.replace(anchor, anchor + scan, 1))
           print('added shared-lib binary validity check to core/main.mk')
           PY
-          grep -n -A5 "INVALID_SHARED_LIB_DEPS" build/make/core/main.mk
+          grep -n -A4 "check-shared-lib-deps" build/make/core/main.mk
+          # bootable/recovery's FBE block names four modules the twrp-14 tree does
+          # not define on any branch: libkeystoreinfo lives in AOSP's
+          # keystore/Android.mk, which TeamWin's system/security fork replaced with
+          # an Android.bp that has no such target, and TeamWin's android-14 forks of
+          # external/sqlite and external/icu dropped recovery_available, so the
+          # .recovery variants do not exist either. libtar is pure tar C code and
+          # never references them.
+          sed -i -E 's/^([[:space:]]*)(libkeystoreinfo|libkeystoreinfo\.recovery|libsqlite\.recovery|libandroidicu\.recovery)[[:space:]]*\\$/\1/' \
+            bootable/recovery/libtar/Android.mk bootable/recovery/Android.mk
+          grep -n "libkeystoreinfo\|libsqlite.recovery\|libandroidicu.recovery" \
+            bootable/recovery/libtar/Android.mk bootable/recovery/Android.mk || echo "dangling FBE deps removed"
 
       - name: Build
         run: |
@@ -406,12 +416,16 @@ jobs:
           echo "=== out products ==="; ls -la out/target/product/taiko/ 2>&1 | head -40
           echo "=== last error traces ==="
           find out -name '*.log' -newermt '-40 minutes' 2>/dev/null | head -10 | xargs -r tail -n 40
-          echo "=== INVALID LOCAL_SHARED_LIBRARIES ==="
-          grep -rn "INVALID LOCAL_SHARED_LIBRARIES" out/*.log out/soong/*.log 2>/dev/null | head -5
-          echo "=== soong view of the flagged .so deps ==="
-          grep -rn "android.security.apc" out/soong/Android-*.mk 2>/dev/null | head -5 || echo "no apc entry in Soong Android.mk"
-          grep -rn "name: \"android.security.apc" system/security/keystore2/aidl/Android.bp 2>/dev/null
-          grep -rn "libtar" out/soong/Android-*.mk 2>/dev/null | head -3 || echo "libtar not a Soong module (expected: it is a Make module)"
+          echo "=== shared-lib dep scan ==="
+          grep -rh "INVALID_SHARED_LIB \|NONEXISTENT:\|dep scan:" out/soong/build.log out/build.log out/soong/*.log out/*.log 2>/dev/null | head -80 || echo "scan output not captured in any out/*.log"
+          echo "=== product config: PRODUCT_PACKAGES seen by Soong ==="
+          grep -rn "android.security.apc-ndk_platform\|libandroidicu.recovery\|libsqlite.recovery" out/soong/*.mk out/*.mk 2>/dev/null | head -20 || echo "not in any dumped config"
+          echo "=== Soong's own view of the AIDL NDK stubs ==="
+          grep -rn "android.security.apc-ndk\|android.system.keystore2-V1-ndk\|android.security.authorization-ndk\|android.security.maintenance-ndk" out/soong/Android-*.mk 2>/dev/null | grep "LOCAL_MODULE :=\|LOCAL_MODULE_CLASS" | head -30 || echo "no NDK stub entries in Soong Android.mk"
+          echo "=== recovery module entry in Soong Android.mk ==="
+          grep -rn "android.hardware.boot@1.0\b" out/soong/Android-*.mk 2>/dev/null | head -5 || echo "no hidl stub entries either"
+          echo "=== apc interface definition ==="
+          grep -rn -A12 'name: "android.security.apc"' system/security/keystore2/aidl/Android.bp 2>/dev/null
           exit 0
 
       - name: Upload artifacts

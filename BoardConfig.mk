@@ -166,12 +166,15 @@ PLATFORM_SECURITY_PATCH := 2099-12-31
 TARGET_SCREEN_WIDTH := 1600
 TARGET_SCREEN_HEIGHT := 2560
 
-# Crypto FBE - target awal: boot + mount dasar. Decrypt A16 kemungkinan
-# belum jalan di bringup pertama, siapkan OTG sebagai fallback.
-TW_INCLUDE_CRYPTO := true
-TW_INCLUDE_CRYPTO_FBE := true
-TW_INCLUDE_FBE_METADATA_DECRYPT := true
-TW_USE_FSCRYPT_POLICY := 2
+# Crypto FBE - OFF untuk bringup. Blok FBE di bootable/recovery milik
+# TeamWin android-14 menyebut modul yang tidak ada di tree ini:
+# libkeystoreinfo, libkeystoreinfo.recovery, libsqlite.recovery,
+# libandroidicu.recovery (fork system/security + external/sqlite + external/icu
+# TeamWin tidak punya target itu). Nyalakan lagi setelah recovery bisa boot.
+TW_INCLUDE_CRYPTO := false
+TW_INCLUDE_CRYPTO_FBE := false
+TW_INCLUDE_FBE_METADATA_DECRYPT :=
+TW_USE_FSCRYPT_POLICY :=
 
 # ---- TWRP flags ----
 TW_THEME := landscape_hdpi

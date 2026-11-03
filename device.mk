@@ -51,9 +51,9 @@ PRODUCT_PACKAGES += \
     android.hardware.boot@1.2-impl \
     android.hardware.boot@1.2-service
 
-# libtar (bootable/recovery, TW_INCLUDE_CRYPTO_FBE) links these AIDL NDK stubs.
-# They are reachable only from a Make module, so Soong never builds them unless
-# the product names them -- leaving a dangling <lib>.so.toc link prerequisite.
+# Keystore2 AIDL NDK stubs. Only reachable from Make modules, so Soong will not
+# build them unless the product names them. Needed again when TW_INCLUDE_CRYPTO
+# comes back on; harmless while it is off.
 PRODUCT_PACKAGES += \
     android.security.apc-ndk_platform \
     android.system.keystore2-V1-ndk_platform \
