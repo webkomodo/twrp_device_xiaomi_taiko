@@ -238,6 +238,48 @@ jobs:
               print('merge-fc-files already present')
           PY
           grep -n "merge-fc-files" build/make/core/Makefile
+          # TeamWin build/make android-14.1 wrapped the init_rc install rules in
+          # core/base_rules.mk with "ifneq ($(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK))",
+          # on the assumption that Soong installs its own init_rc files. The paired
+          # Soong is android-14, which only registers a PackagingSpec (consumed when
+          # assembling images) and emits no standalone rule -- yet it still writes
+          # LOCAL_FULL_INIT_RC, so base_rules.mk records the path in
+          # ALL_MODULES.<mod>.INSTALLED. Net effect: ramdisk.img ends up depending
+          # on out/target/product/<dev>/ramdisk/system/etc/init/snapuserd.rc with
+          # no rule to build it. AOSP 14 has no such guard, so drop it.
+          python3 - <<'PY'
+          import sys
+          p = 'build/make/core/base_rules.mk'
+          s = open(p).read()
+          old = (
+              "      my_init_rc_new_pairs := $(filter-out $(ALL_INIT_RC_INSTALLED_PAIRS),$(my_init_rc_pairs))\n"
+              "      ALL_INIT_RC_INSTALLED_PAIRS += $(my_init_rc_new_pairs)\n"
+              "\n"
+              "      ifneq ($(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK))\n"
+              "        $(call copy-many-init-script-files-checked,$(my_init_rc_new_pairs))\n"
+              "        $(my_all_targets) : $(my_init_rc_installed)\n"
+              "        # Install init_rc together with the target\n"
+              "        $(LOCAL_INSTALLED_MODULE) : | $(my_init_rc_installed)\n"
+              "      endif\n"
+          )
+          new = (
+              "      my_init_rc_new_pairs := $(filter-out $(ALL_INIT_RC_INSTALLED_PAIRS),$(my_init_rc_pairs))\n"
+              "      ALL_INIT_RC_INSTALLED_PAIRS += $(my_init_rc_new_pairs)\n"
+              "\n"
+              "      $(call copy-many-init-script-files-checked,$(my_init_rc_new_pairs))\n"
+              "      $(my_all_targets) : $(my_init_rc_installed)\n"
+              "      # Install init_rc together with the target\n"
+              "      $(LOCAL_INSTALLED_MODULE) : | $(my_init_rc_installed)\n"
+          )
+          if old in s:
+              open(p, 'w').write(s.replace(old, new, 1))
+              print('removed SOONG_ANDROID_MK guard around init_rc install rules')
+          elif 'ifneq ($(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK))\n        $(call copy-many-init-script-files-checked' not in s:
+              print('init_rc guard already absent')
+          else:
+              sys.exit('init_rc guard block not found verbatim in base_rules.mk')
+          PY
+          grep -n -B1 -A4 "copy-many-init-script-files-checked" build/make/core/base_rules.mk
           # TeamWin build/make is android-14.1 but TeamWin build/soong is
           # android-14: aconfig module types (aconfig_declarations, *_aconfig_library)
           # don't exist in that Soong. The Android.bp under tools/aconfig is still
