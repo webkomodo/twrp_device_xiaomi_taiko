@@ -193,6 +193,15 @@ jobs:
           sed -i 's|$(call add_json_str,  EnableUffdGc,                            $(ENABLE_UFFD_GC))|$(call add_json_bool, EnableUffdGc,                            $(filter true,$(ENABLE_UFFD_GC)))|' build/make/core/dex_preopt_config.mk
           grep -n 'SOONG_VARIABLES :=' build/make/core/soong_config.mk
           grep -n 'EnableUffdGc' build/make/core/dex_preopt_config.mk
+          # TeamWin build/make android-14.1 declares FILE_NAME_TAG obsolete (that
+          # change only landed in newer AOSP), but the paired TeamWin build/soong
+          # is android-14 and its android_sdk/sdk_repo_host.go still writes
+          # "$(FILE_NAME_TAG)" into out/soong/Android-$(TARGET_PRODUCT).mk.
+          # KATI_obsolete_var is a ckati builtin that aborts on any *read* of the
+          # variable, so defining it does not help -- the declaration itself has
+          # to go. AOSP 14 (the version matching this Soong) just sets it.
+          sed -i '/KATI_obsolete_var FILE_NAME_TAG,/d' build/make/core/main.mk
+          grep -c 'KATI_obsolete_var FILE_NAME_TAG' build/make/core/main.mk || echo "FILE_NAME_TAG obsolete decl removed"
           # TeamWin build/make is android-14.1 but TeamWin build/soong is
           # android-14: aconfig module types (aconfig_declarations, *_aconfig_library)
           # don't exist in that Soong. The Android.bp under tools/aconfig is still
