@@ -367,7 +367,7 @@ jobs:
           # external/sqlite and external/icu dropped recovery_available, so the
           # .recovery variants do not exist either. libtar is pure tar C code and
           # never references them.
-          sed -i -E 's/^([[:space:]]*)(libkeystoreinfo|libkeystoreinfo\.recovery|libsqlite\.recovery|libandroidicu\.recovery)[[:space:]]*\\$/\1/' \
+          sed -i -E '/^[[:space:]]*(libkeystoreinfo|libkeystoreinfo\.recovery|libsqlite\.recovery|libandroidicu\.recovery)[[:space:]]*\\$/d' \
             bootable/recovery/libtar/Android.mk bootable/recovery/Android.mk
           grep -n "libkeystoreinfo\|libsqlite.recovery\|libandroidicu.recovery" \
             bootable/recovery/libtar/Android.mk bootable/recovery/Android.mk || echo "dangling FBE deps removed"
