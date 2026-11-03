@@ -202,6 +202,15 @@ jobs:
           # to go. AOSP 14 (the version matching this Soong) just sets it.
           sed -i '/KATI_obsolete_var FILE_NAME_TAG,/d' build/make/core/main.mk
           grep -c 'KATI_obsolete_var FILE_NAME_TAG' build/make/core/main.mk || echo "FILE_NAME_TAG obsolete decl removed"
+          # core/Makefile:7117 auto-includes every build/make/core/tasks/*.mk.
+          # TeamWin build/make android-14.1 moved the fontchain_lint rule out of
+          # frameworks/base/data/fonts/Android.mk into core/tasks/, but the
+          # frameworks/base project is still synced at android-14 and defines the
+          # exact same stamp target -> ckati aborts with "overriding commands for
+          # target ... fontchain_lint_intermediates/stamp". AOSP 14 has no
+          # core/tasks/fontchain_lint.mk, so drop the newer copy.
+          rm -f build/make/core/tasks/fontchain_lint.mk
+          ls build/make/core/tasks/fontchain_lint.mk 2>/dev/null || echo "fontchain_lint.mk removed"
           # TeamWin build/make is android-14.1 but TeamWin build/soong is
           # android-14: aconfig module types (aconfig_declarations, *_aconfig_library)
           # don't exist in that Soong. The Android.bp under tools/aconfig is still
