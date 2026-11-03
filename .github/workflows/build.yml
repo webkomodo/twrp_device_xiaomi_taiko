@@ -48,6 +48,22 @@ jobs:
       - name: Disk report after free
         run: df -h /
 
+      # Runner hosted cuma 15.6GB RAM dan free-disk-space di atas sudah menghapus
+      # swap. Soong bootstrap + analisis Android.bp butuh >8GB; tanpa swap, OOM
+      # killer bisa menjatuhkan proses agent runner -> "hosted runner lost
+      # communication with the server". Disk masih >100GB, aman untuk 12GB swap.
+      - name: Add swap headroom
+        run: |
+          set -eo pipefail
+          sudo swapoff -a || true
+          sudo rm -f /swapfile
+          sudo fallocate -l 12G /swapfile || sudo dd if=/dev/zero of=/swapfile bs=1M count=12288 status=none
+          sudo chmod 600 /swapfile
+          sudo mkswap /swapfile
+          sudo swapon /swapfile || true
+          free -h
+          df -h /
+
       - name: Install deps
         run: |
           sudo apt-get update -qq
@@ -219,6 +235,12 @@ jobs:
           export LC_ALL=C
           export USE_CCACHE=1
           export CCACHE_DIR="$WORKSPACE/.ccache"
+          # Soong android-14 bawaan TeamWin menyalakan Bazel mixed-build di Linux
+          # (defaultBazelProdMode() -> true). Itu memaksa bp2build (konversi semua
+          # Android.bp -> BUILD) + "Creating Bazel symlink forest" — dua langkah
+          # berat yang TIDAK diperlukan untuk recovery image, dan sumber semua
+          # error "bp2build_files_marker" sebelumnya.
+          export BUILD_BROKEN_DISABLE_BAZEL=true
           ccache -M 10G -F 0 || true
           . build/envsetup.sh
           # A14+ wajib 3 bagian: product-release-variant. A12: 2 bagian.
@@ -230,8 +252,11 @@ jobs:
           # Panggil soong_ui langsung (ekuivalen 'm') supaya bisa skip
           # Go unit tests host ("test android/soong/*") — tidak dibutuhkan
           # untuk recovery image.
+          # -j3 bukan -j4: runner hosted cuma 4 vCPU / 15.6GB RAM. Sisakan 1 core
+          # untuk agent runner supaya heartbeat tidak terputus (error
+          # "hosted runner lost communication with the server").
           build/soong/soong_ui.bash --make-mode --skip-soong-tests \
-            -j"$(nproc --all)" recoveryimage vendorbootimage
+            -j3 recoveryimage vendorbootimage
 
       - name: Diagnostics on failure
         if: failure()
