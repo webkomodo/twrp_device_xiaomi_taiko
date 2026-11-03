@@ -1,5 +1,5 @@
-# device.mk minimal buat recovery taiko. Sengaja TIDAK copy device.mk Lineage
-# (audio/kamera/sensor tidak dibutuhkan recovery dan bikin build berat).
+# Minimal device.mk for taiko recovery. Deliberately not Lineage's device.mk:
+# audio/camera/sensor are useless here and only slow the build down.
 DEVICE_PATH := device/xiaomi/taiko
 
 # A/B virtual + dynamic partitions
@@ -32,17 +32,16 @@ AB_OTA_POSTINSTALL_CONFIG += \
     FILESYSTEM_TYPE_vendor=ext4 \
     POSTINSTALL_OPTIONAL_vendor=true
 
-# NOTE: file recovery/root/init.recovery.mt6789.rc (insmod driver touch
-# varian Goodix) ter-copy OTOMATIS ke ramdisk recovery oleh build system
-# (mekanisme recovery/root), lalu di-import TWRP via
-# "import /init.recovery.${ro.hardware}.rc". Tidak perlu PRODUCT_COPY_FILES.
+# recovery/root/etc/init.recovery.mt6789.rc is copied into the recovery ramdisk
+# by the build system (recovery/root mechanism) and imported by TWRP via
+# "import /init.recovery.${ro.hardware}.rc", so no PRODUCT_COPY_FILES needed.
 
-# Fastbootd (penting buat device A/B tanpa recovery partition)
+# Fastbootd (required for A/B devices without a recovery partition)
 PRODUCT_PACKAGES += \
     android.hardware.fastboot@1.1-impl-mock \
     fastbootd
 
-# Health (biar baterai % kebaca di recovery)
+# Health, so the battery percentage reads correctly in recovery
 PRODUCT_PACKAGES += \
     android.hardware.health-service.example \
     android.hardware.health-service.example_recovery
@@ -51,6 +50,15 @@ PRODUCT_PACKAGES += \
 PRODUCT_PACKAGES += \
     android.hardware.boot@1.2-impl \
     android.hardware.boot@1.2-service
+
+# libtar (bootable/recovery, TW_INCLUDE_CRYPTO_FBE) links these AIDL NDK stubs.
+# They are reachable only from a Make module, so Soong never builds them unless
+# the product names them -- leaving a dangling <lib>.so.toc link prerequisite.
+PRODUCT_PACKAGES += \
+    android.security.apc-ndk_platform \
+    android.system.keystore2-V1-ndk_platform \
+    android.security.authorization-ndk_platform \
+    android.security.maintenance-ndk_platform
 
 PRODUCT_SOONG_NAMESPACES += \
     $(DEVICE_PATH)
