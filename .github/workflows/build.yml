@@ -25,7 +25,7 @@ jobs:
     timeout-minutes: 300
 
     steps:
-      # Runner GitHub cuma ~14GB kosong. TWRP butuh 80-100GB.
+      # GitHub runners ship ~14GB free; TWRP needs 80-100GB.
       # Hapus toolchain preinstall (/usr/local/lib/android ~9GB, dotnet, ghc, haskell)
       # + swap file + docker image. Ini trik standar build AOSP di Actions.
       - name: Free disk space (largest)
@@ -35,7 +35,7 @@ jobs:
           android: true
           dotnet: true
           haskell: true
-          large-packages: false      # butuh beberapa pkg tetap (build-essential dll)
+          large-packages: false      # a few packages are still needed (build-essential et al)
           docker-images: true
           swap-storage: true
 
@@ -49,9 +49,8 @@ jobs:
         run: df -h /
 
       # Runner hosted cuma 15.6GB RAM dan free-disk-space di atas sudah menghapus
-      # swap. Soong bootstrap + analisis Android.bp butuh >8GB; tanpa swap, OOM
-      # killer bisa menjatuhkan proses agent runner -> "hosted runner lost
-      # communication with the server". Disk masih >100GB, aman untuk 12GB swap.
+      # Soong bootstrap + Android.bp analysis needs >8GB; without swap the OOM
+      # killer takes the runner agent down with it. Disk is >100GB, so 12GB is safe.
       - name: Add swap headroom
         run: |
           set -eo pipefail
@@ -94,13 +93,13 @@ jobs:
           cd "$WORKSPACE"
           rm -rf "$DEVICE_DIR" "$KERNEL_DIR"
           mkdir -p "$(dirname "$DEVICE_DIR")"
-          # Device tree: dsalin dari checkout step (working tree, bukan fetch ulang)
+          # Device tree: copy from the checkout step, do not fetch again.
           cp -r "$GITHUB_WORKSPACE/devicetree" "$DEVICE_DIR"
           rm -rf "$DEVICE_DIR/.git" "$DEVICE_DIR/.github" || true
           git -C "$DEVICE_DIR" init -q
           git -C "$DEVICE_DIR" add -A
           git -C "$DEVICE_DIR" -c user.name=ci -c user.email=ci@local commit -qm device-tree || true
-          # Kernel tree: clone dari repo GitHub pemilik sama
+          # Kernel tree: clone from the owner's GitHub repo.
           git clone --depth=1 "https://github.com/${KERNEL_TREE}.git" "$KERNEL_DIR"
           echo "--- device ---"; ls "$DEVICE_DIR"
           echo "--- kernel ---"; ls "$KERNEL_DIR"
@@ -109,12 +108,10 @@ jobs:
         run: |
           set -euo pipefail
           cd "$WORKSPACE"
-          # TeamWin android-14.1 build/make/core/release_config.scl meng-import
-          # //build/bazel/utils:schema_validation.scl, tapi AOSP
-          # build/bazel@android-14.0.0_r17 tidak menyediakannya.
-          # Tanpa file ini rbcrun gagal dan out/starlark_results/
-          # out_release_config_entrypoint.scl.mk tidak pernah dibuat
-          # ("release_config.mk:237: No such file or directory").
+          # TeamWin android-14.1 build/make/core/release_config.scl imports
+          # //build/bazel/utils:schema_validation.scl, which the synced AOSP
+          # build/bazel@android-14.0.0_r17 does not ship. Without it rbcrun fails
+          # and out_release_config_entrypoint.scl.mk is never generated.
           mkdir -p build/bazel/utils
           cp "$DEVICE_DIR/helpers/schema_validation.scl" build/bazel/utils/schema_validation.scl
           ls -la build/bazel/utils/schema_validation.scl
@@ -137,7 +134,7 @@ jobs:
           RELEASE_PLATFORM_SECURITY_PATCH := 2024-01-05
           RELEASE_PLATFORM_VNDK_VERSION := 34
           EOF
-          # toolchain/pgo-profiles (grup pdk) tidak ikut ter-sync; stub AFDO kosong.
+          # toolchain/pgo-profiles (pdk group) is not synced; stub an empty AFDO.
           if [ ! -f toolchain/pgo-profiles/sampling/afdo_profiles.mk ]; then
             mkdir -p toolchain/pgo-profiles/sampling
             touch toolchain/pgo-profiles/sampling/afdo_profiles.mk
@@ -193,29 +190,19 @@ jobs:
           sed -i 's|$(call add_json_str,  EnableUffdGc,                            $(ENABLE_UFFD_GC))|$(call add_json_bool, EnableUffdGc,                            $(filter true,$(ENABLE_UFFD_GC)))|' build/make/core/dex_preopt_config.mk
           grep -n 'SOONG_VARIABLES :=' build/make/core/soong_config.mk
           grep -n 'EnableUffdGc' build/make/core/dex_preopt_config.mk
-          # TeamWin build/make android-14.1 declares FILE_NAME_TAG obsolete (that
-          # change only landed in newer AOSP), but the paired TeamWin build/soong
-          # is android-14 and its android_sdk/sdk_repo_host.go still writes
-          # "$(FILE_NAME_TAG)" into out/soong/Android-$(TARGET_PRODUCT).mk.
-          # KATI_obsolete_var is a ckati builtin that aborts on any *read* of the
-          # variable, so defining it does not help -- the declaration itself has
-          # to go. AOSP 14 (the version matching this Soong) just sets it.
+          # TeamWin build/make android-14.1 marks FILE_NAME_TAG obsolete, but the
+          # paired android-14 Soong still writes it; KATI_obsolete_var aborts on
+          # read, so the declaration itself must go (AOSP 14 just sets it).
           sed -i '/KATI_obsolete_var FILE_NAME_TAG,/d' build/make/core/main.mk
           grep -c 'KATI_obsolete_var FILE_NAME_TAG' build/make/core/main.mk || echo "FILE_NAME_TAG obsolete decl removed"
-          # core/Makefile:7117 auto-includes every build/make/core/tasks/*.mk.
-          # TeamWin build/make android-14.1 moved the fontchain_lint rule out of
-          # frameworks/base/data/fonts/Android.mk into core/tasks/, but the
-          # frameworks/base project is still synced at android-14 and defines the
-          # exact same stamp target -> ckati aborts with "overriding commands for
-          # target ... fontchain_lint_intermediates/stamp". AOSP 14 has no
-          # core/tasks/fontchain_lint.mk, so drop the newer copy.
+          # core/Makefile:7117 auto-includes core/tasks/*.mk. TeamWin moved the
+          # fontchain_lint rule there, but synced frameworks/base (android-14)
+          # still defines the same stamp target -> ckati "overriding commands".
           rm -f build/make/core/tasks/fontchain_lint.mk
           ls build/make/core/tasks/fontchain_lint.mk 2>/dev/null || echo "fontchain_lint.mk removed"
-          # TeamWin android-14.1 dropped the merge-fc-files call from
-          # build/make/core/Makefile, but the synced system/sepolicy is still
-          # android-14 and its Android.mk declares a dependency on
-          # file_contexts.modules.tmp -> ninja dies with "missing and no known
-          # rule to make it". Restore the AOSP 14 block right before SELINUX_FC.
+          # TeamWin android-14.1 dropped merge-fc-files from core/Makefile, but
+          # synced system/sepolicy (android-14) still needs
+          # file_contexts.modules.tmp. Restore the AOSP 14 block.
           python3 - <<'PY'
           import re, sys
           p = 'build/make/core/Makefile'
@@ -238,15 +225,12 @@ jobs:
               print('merge-fc-files already present')
           PY
           grep -n "merge-fc-files" build/make/core/Makefile
-          # TeamWin build/make android-14.1 wrapped the init_rc install rules in
-          # core/base_rules.mk with "ifneq ($(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK))",
-          # on the assumption that Soong installs its own init_rc files. The paired
-          # Soong is android-14, which only registers a PackagingSpec (consumed when
-          # assembling images) and emits no standalone rule -- yet it still writes
-          # LOCAL_FULL_INIT_RC, so base_rules.mk records the path in
-          # ALL_MODULES.<mod>.INSTALLED. Net effect: ramdisk.img ends up depending
-          # on out/target/product/<dev>/ramdisk/system/etc/init/snapuserd.rc with
-          # no rule to build it. AOSP 14 has no such guard, so drop it.
+          # TeamWin android-14.1 guards the init_rc install rules in
+          # base_rules.mk behind LOCAL_MODULE_MAKEFILE != SOONG_ANDROID_MK,
+          # assuming Soong installs them. The paired android-14 Soong only
+          # registers a PackagingSpec, so the path still lands in
+          # ALL_MODULES.<mod>.INSTALLED with no rule behind it. AOSP 14 is
+          # unguarded; drop the guard.
           python3 - <<'PY'
           import sys
           p = 'build/make/core/base_rules.mk'
@@ -280,12 +264,7 @@ jobs:
               sys.exit('init_rc guard block not found verbatim in base_rules.mk')
           PY
           grep -n -B1 -A4 "copy-many-init-script-files-checked" build/make/core/base_rules.mk
-          # Same defect, vintf manifest fragments: TeamWin android-14.1 also guards
-          # copy-many-vintf-manifest-files-checked with
-          # "ifneq ($(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK))", so Soong modules
-          # installed into vendor get their fragment path recorded in
-          # ALL_MODULES.<mod>.INSTALLED (and thus pulled into the recovery relink
-          # dependency set) without any rule producing it. AOSP 14 is unguarded.
+          # Same defect for vintf manifest fragments; same guard, same fix.
           python3 - <<'PY'
           import sys
           p = 'build/make/core/base_rules.mk'
@@ -319,23 +298,13 @@ jobs:
               sys.exit('vintf guard block not found verbatim in base_rules.mk')
           PY
           grep -n -B1 -A4 "copy-many-vintf-manifest-files-checked" build/make/core/base_rules.mk
-          # TeamWin build/make is android-14.1 but TeamWin build/soong is
-          # android-14: aconfig module types (aconfig_declarations, *_aconfig_library)
-          # don't exist in that Soong. The Android.bp under tools/aconfig is still
-          # picked up by the global Android.bp.list, so drop the directory; nothing
-          # in a recovery build consumes those flags.
+          # aconfig module types don't exist in the paired android-14 Soong.
           rm -rf build/make/tools/aconfig
-          # update_engine (android-14.1) still ships its own libbinderwrapper,
-          # but TeamWin system/core (android-14) already defines those modules.
+          # update_engine android-14.1 duplicates libbinderwrapper already in
+          # TeamWin system/core android-14.
           rm -rf system/update_engine/libbinderwrapper
-          # external/brotli (AOSP) whitelists who may use libbrotli and does not
-          # list //system/extras/partition_tools; lpdumpd pulls it in via
-          # libsnapshot_cow. Recovery doesn't need lpdumpd, so drop the module
-          # instead of editing an AOSP file.
-          # lpdumpd pulls libbrotli via libsnapshot_cow, but external/brotli
-          # (AOSP) visibility doesn't list //system/extras/partition_tools.
-          # Recovery doesn't need lpdumpd, so drop the module instead of
-          # editing an AOSP file.
+          # lpdumpd pulls libbrotli, whose AOSP visibility excludes
+          # //system/extras/partition_tools; recovery doesn't need it.
           python3 -c "
           import re
           p='system/extras/partition_tools/Android.bp'
@@ -350,22 +319,60 @@ jobs:
           # declares "fuzz_config.triage_assignee" which TeamWin soong's fuzz
           # module struct doesn't know.
           sed -i '/triage_assignee/d' system/update_engine/Android.bp
+          # LOCAL_SHARED_LIBRARIES must name a module Make registers as
+          # SHARED_LIBRARIES. binary.mk unconditionally emits "<lib>.so.toc" as a
+          # link prerequisite for every entry, so an unknown name dangles and only
+          # surfaces much later as an opaque ninja "no known rule to make it".
+          # resolve-shared-libs-depes runs after every Android.mk (incl. Soong's)
+          # is loaded, so ALL_MODULES.<dep>.CLASS is complete there.
+          python3 - <<'PY'
+          import sys
+          p = 'build/make/core/main.mk'
+          s = open(p).read()
+          if 'INVALID_SHARED_LIB_DEPS' in s:
+              print('shared-lib binary check already present')
+              sys.exit(0)
+          anchor = (
+              "  $(eval r := $(filter $($(root))/%,$(call module-installed-files,\\\n"
+              "    $(deps))))\\\n"
+          )
+          check = (
+              "  $(eval unresolved_so_deps := $(foreach d,$(deps),$(if $(filter SHARED_LIBRARIES,$(ALL_MODULES.$(d).CLASS)),,$(d))))\\\n"
+              "  $(if $(unresolved_so_deps),$(eval INVALID_SHARED_LIB_DEPS += \"$(mod) -> $(unresolved_so_deps)\"))\\\n"
+          )
+          if anchor not in s:
+              sys.exit('resolve-shared-libs-depes anchor not found in core/main.mk')
+          s = s.replace(anchor, anchor + check, 1)
+          tail = (
+              "endif\nendif\n\n"
+              "# Pass the shared libraries dependencies to prebuilt ELF file check.\n"
+          )
+          abort = (
+              "ifneq ($(strip $(INVALID_SHARED_LIB_DEPS)),)\n"
+              "$(error INVALID LOCAL_SHARED_LIBRARIES (not registered as "
+              "SHARED_LIBRARIES, so no .so/.so.toc rule exists): "
+              "$(INVALID_SHARED_LIB_DEPS))\n"
+              "endif\n\n"
+          )
+          if tail not in s:
+              sys.exit('post-resolve anchor not found in core/main.mk')
+          s = s.replace(tail, tail + abort, 1)
+          open(p, 'w').write(s)
+          print('added shared-lib binary validity check to core/main.mk')
+          PY
+          grep -n -A5 "INVALID_SHARED_LIB_DEPS" build/make/core/main.mk
 
       - name: Build
         run: |
-          # JANGAN pakai 'set -u': envsetup.sh AOSP reference $TOP yang belum
-          # di-set, langsung mati "TOP: unbound variable".
+          # envsetup.sh references unset $TOP, so 'set -u' would abort the shell.
           set -eo pipefail
           cd "$WORKSPACE"
           export ALLOW_MISSING_DEPENDENCIES=true
           export LC_ALL=C
           export USE_CCACHE=1
           export CCACHE_DIR="$WORKSPACE/.ccache"
-          # Soong android-14 bawaan TeamWin menyalakan Bazel mixed-build di Linux
-          # (defaultBazelProdMode() -> true). Itu memaksa bp2build (konversi semua
-          # Android.bp -> BUILD) + "Creating Bazel symlink forest" — dua langkah
-          # berat yang TIDAK diperlukan untuk recovery image, dan sumber semua
-          # error "bp2build_files_marker" sebelumnya.
+          # Soong android-14 enables Bazel mixed-build on Linux, forcing a full
+          # bp2build pass plus a symlink forest that recovery does not need.
           export BUILD_BROKEN_DISABLE_BAZEL=true
           ccache -M 10G -F 0 || true
           . build/envsetup.sh
@@ -375,12 +382,9 @@ jobs:
           else
             lunch twrp_taiko-trunk_staging-eng
           fi
-          # Panggil soong_ui langsung (ekuivalen 'm') supaya bisa skip
-          # Go unit tests host ("test android/soong/*") — tidak dibutuhkan
-          # untuk recovery image.
-          # -j3 bukan -j4: runner hosted cuma 4 vCPU / 15.6GB RAM. Sisakan 1 core
-          # untuk agent runner supaya heartbeat tidak terputus (error
-          # "hosted runner lost communication with the server").
+          # Call soong_ui directly (equivalent of 'm') so the host Go unit tests
+          # can be skipped. -j3 not -j4: leave one core free for the runner agent,
+          # otherwise the heartbeat drops ("hosted runner lost communication").
           build/soong/soong_ui.bash --make-mode --skip-soong-tests \
             -j3 recoveryimage vendorbootimage
 
@@ -402,6 +406,12 @@ jobs:
           echo "=== out products ==="; ls -la out/target/product/taiko/ 2>&1 | head -40
           echo "=== last error traces ==="
           find out -name '*.log' -newermt '-40 minutes' 2>/dev/null | head -10 | xargs -r tail -n 40
+          echo "=== INVALID LOCAL_SHARED_LIBRARIES ==="
+          grep -rn "INVALID LOCAL_SHARED_LIBRARIES" out/*.log out/soong/*.log 2>/dev/null | head -5
+          echo "=== soong view of the flagged .so deps ==="
+          grep -rn "android.security.apc" out/soong/Android-*.mk 2>/dev/null | head -5 || echo "no apc entry in Soong Android.mk"
+          grep -rn "name: \"android.security.apc" system/security/keystore2/aidl/Android.bp 2>/dev/null
+          grep -rn "libtar" out/soong/Android-*.mk 2>/dev/null | head -3 || echo "libtar not a Soong module (expected: it is a Make module)"
           exit 0
 
       - name: Upload artifacts
