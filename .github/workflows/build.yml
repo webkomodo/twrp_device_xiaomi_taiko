@@ -280,6 +280,45 @@ jobs:
               sys.exit('init_rc guard block not found verbatim in base_rules.mk')
           PY
           grep -n -B1 -A4 "copy-many-init-script-files-checked" build/make/core/base_rules.mk
+          # Same defect, vintf manifest fragments: TeamWin android-14.1 also guards
+          # copy-many-vintf-manifest-files-checked with
+          # "ifneq ($(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK))", so Soong modules
+          # installed into vendor get their fragment path recorded in
+          # ALL_MODULES.<mod>.INSTALLED (and thus pulled into the recovery relink
+          # dependency set) without any rule producing it. AOSP 14 is unguarded.
+          python3 - <<'PY'
+          import sys
+          p = 'build/make/core/base_rules.mk'
+          s = open(p).read()
+          old = (
+              "      my_vintf_new_pairs := $(filter-out $(ALL_VINTF_MANIFEST_FRAGMENTS_LIST),$(my_vintf_pairs))\n"
+              "      ALL_VINTF_MANIFEST_FRAGMENTS_LIST += $(my_vintf_new_pairs)\n"
+              "\n"
+              "      ifneq ($(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK))\n"
+              "        $(call copy-many-vintf-manifest-files-checked,$(my_vintf_new_pairs))\n"
+              "        $(my_all_targets) : $(my_vintf_installed)\n"
+              "        # Install fragments together with the target\n"
+              "        $(LOCAL_INSTALLED_MODULE) : | $(my_vintf_installed)\n"
+              "     endif\n"
+          )
+          new = (
+              "      my_vintf_new_pairs := $(filter-out $(ALL_VINTF_MANIFEST_FRAGMENTS_LIST),$(my_vintf_pairs))\n"
+              "      ALL_VINTF_MANIFEST_FRAGMENTS_LIST += $(my_vintf_new_pairs)\n"
+              "\n"
+              "      $(call copy-many-vintf-manifest-files-checked,$(my_vintf_new_pairs))\n"
+              "      $(my_all_targets) : $(my_vintf_installed)\n"
+              "      # Install fragments together with the target\n"
+              "      $(LOCAL_INSTALLED_MODULE) : | $(my_vintf_installed)\n"
+          )
+          if old in s:
+              open(p, 'w').write(s.replace(old, new, 1))
+              print('removed SOONG_ANDROID_MK guard around vintf fragment install rules')
+          elif 'ifneq ($(LOCAL_MODULE_MAKEFILE),$(SOONG_ANDROID_MK))\n        $(call copy-many-vintf-manifest-files-checked' not in s:
+              print('vintf guard already absent')
+          else:
+              sys.exit('vintf guard block not found verbatim in base_rules.mk')
+          PY
+          grep -n -B1 -A4 "copy-many-vintf-manifest-files-checked" build/make/core/base_rules.mk
           # TeamWin build/make is android-14.1 but TeamWin build/soong is
           # android-14: aconfig module types (aconfig_declarations, *_aconfig_library)
           # don't exist in that Soong. The Android.bp under tools/aconfig is still
